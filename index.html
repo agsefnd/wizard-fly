@@ -58,6 +58,7 @@
       </div>
       <button id="discord-login-button">Login with Discord</button>
       <button id="start-button" style="display:none;">Mulai Game</button>
+
       <div class="leaderboard-box" style="margin-top:20px;">
         <h3>Leaderboard</h3>
         <ol id="leaderboard-list-start" class="lb-list"></ol>
@@ -86,48 +87,90 @@
   </audio>
 
   <script>
+    // DOM
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
-
     const startScreen = document.getElementById('start-screen');
     const gameOverScreen = document.getElementById('game-over-screen');
     const startButton = document.getElementById('start-button');
     const discordLoginButton = document.getElementById('discord-login-button');
     const restartButton = document.getElementById('restart-button');
-
     const scoreElement = document.getElementById('score');
     const highScoreElement = document.getElementById('high-score');
     const finalScoreElement = document.getElementById('final-score');
     const finalHighScoreElement = document.getElementById('final-high-score');
-
     const speedUpText = document.getElementById('speed-up-text');
     const backgroundMusic = document.getElementById('background-music');
-
     const leaderboardOverlay = document.getElementById('leaderboard-container');
     const leaderboardListOverlay = document.getElementById('leaderboard-list');
     const leaderboardListStart = document.getElementById('leaderboard-list-start');
     const leaderboardListGameOver = document.getElementById('gameover-leaderboard-list');
-
     const welcomeMessage = document.getElementById('welcome-message');
     const startTitle = document.getElementById('start-title');
 
+    // state
     let gameRunning = false;
     let score = 0;
     let highScore = Number(localStorage.getItem('highScore') || 0);
     highScoreElement.textContent = highScore;
     let frameCount = 0;
     const wallDistance = 300;
+    let wallSpeed = 4;
     let nextSpeedIncrease = 10;
     let loggedInUser = null;
+    let upPressed = false, downPressed = false;
+    let wizardWidth = 50, wizardHeight = 50;
+    let backgroundX = 0;
 
+    // assets: set crossOrigin BEFORE src (important)
+    const mageImage = new Image();
+    mageImage.crossOrigin = "anonymous";
+    mageImage.src = '/mage.png';
+
+    const backgroundImage = new Image();
+    backgroundImage.crossOrigin = "anonymous";
+    backgroundImage.src = '/island.png';
+
+    let isMageLoaded = false;
+    let isBackgroundLoaded = false;
+
+    // debug logs for image load
+    mageImage.onload = () => {
+      isMageLoaded = true;
+      console.log('mage.png loaded', mageImage.width, 'x', mageImage.height);
+      // update wizard size based on image ratio
+      const ratio = mageImage.width / mageImage.height || 1;
+      wizardWidth = 100;
+      wizardHeight = Math.round(wizardWidth / ratio);
+      if (wizard) { wizard.width = wizardWidth; wizard.height = wizardHeight; }
+      // if background already loaded, start anim
+      if (isBackgroundLoaded) animateStartScreen();
+    };
+    mageImage.onerror = (e) => {
+      isMageLoaded = false;
+      console.warn('mage.png failed to load', e);
+      if (isBackgroundLoaded) animateStartScreen();
+    };
+
+    backgroundImage.onload = () => {
+      isBackgroundLoaded = true;
+      console.log('island.png loaded', backgroundImage.width, 'x', backgroundImage.height);
+      if (isMageLoaded) animateStartScreen();
+    };
+    backgroundImage.onerror = (e) => {
+      isBackgroundLoaded = false;
+      console.warn('island.png failed to load', e);
+      if (isMageLoaded) animateStartScreen();
+    };
+
+    // check URL params (discord)
     const urlParams = new URLSearchParams(window.location.search);
     const username = urlParams.get('username');
     const userId = urlParams.get('id');
     const fetchedHighScore = urlParams.get('highScore');
-
     if (username && userId) {
       loggedInUser = { id: userId, username };
-      highScore = fetchedHighScore ? parseInt(fetchedHighScore, 10) : 0;
+      highScore = fetchedHighScore ? parseInt(fetchedHighScore, 10) : highScore;
       localStorage.setItem('highScore', String(highScore));
       highScoreElement.textContent = highScore;
       discordLoginButton.style.display = 'none';
@@ -142,179 +185,166 @@
       leaderboardOverlay.style.display = 'none';
     }
 
-    let upPressed = false, downPressed = false;
-
-    // 🔧 FIX: tambahkan crossOrigin sebelum set src
-    const mageImage = new Image();
-    mageImage.crossOrigin = "anonymous";
-    mageImage.src = '/mage.png';
-    let isMageLoaded = false;
-    let wizardWidth = 50, wizardHeight = 50;
-
-    const backgroundImage = new Image();
-    backgroundImage.crossOrigin = "anonymous";
-    backgroundImage.src = '/island.png';
-    let isBackgroundLoaded = false, backgroundX = 0;
-
+    // WIZARD (defined before onload uses)
     const wizard = {
-      x: 100, y: canvas.height/2, width: wizardWidth, height: wizardHeight, speedY: 7,
-      draw(){
-        const hover = Math.sin(frameCount*0.1)*5;
-        if (isMageLoaded){
-          ctx.drawImage(mageImage, this.x - this.width/2, this.y - this.height/2 + hover, this.width, this.height);
+      x: 100,
+      y: canvas.height / 2,
+      width: wizardWidth,
+      height: wizardHeight,
+      speedY: 7,
+      draw() {
+        const hover = Math.sin(frameCount * 0.1) * 5;
+        if (isMageLoaded) {
+          // ensure width/height are numbers
+          const w = this.width || wizardWidth;
+          const h = this.height || wizardHeight;
+          ctx.drawImage(mageImage, this.x - w / 2, this.y - h / 2 + hover, w, h);
         } else {
-          ctx.fillStyle='#9c27b0';
+          ctx.fillStyle = '#9c27b0';
           ctx.beginPath();
-          ctx.arc(this.x, this.y+hover, this.width/2, 0, Math.PI*2);
+          ctx.arc(this.x, this.y + hover, (this.width || wizardWidth) / 2, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle='#4a148c';
+          ctx.fillStyle = '#4a148c';
           ctx.beginPath();
-          ctx.moveTo(this.x - this.width/2, this.y+hover - 15);
-          ctx.lineTo(this.x + this.width/2, this.y+hover - 15);
-          ctx.lineTo(this.x, this.y+hover - 40);
+          ctx.moveTo(this.x - (this.width || wizardWidth) / 2, this.y + hover - 15);
+          ctx.lineTo(this.x + (this.width || wizardWidth) / 2, this.y + hover - 15);
+          ctx.lineTo(this.x, this.y + hover - 40);
           ctx.closePath();
           ctx.fill();
         }
         ctx.save();
-        ctx.filter='blur(8px)';
-        ctx.fillStyle='rgba(255,255,255,.3)';
+        ctx.filter = 'blur(8px)';
+        ctx.fillStyle = 'rgba(255,255,255,.3)';
         ctx.beginPath();
-        ctx.arc(this.x, this.y+hover, this.width*0.7, 0, Math.PI*2);
+        ctx.arc(this.x, this.y + (Math.sin(frameCount * 0.1) * 5), (this.width || wizardWidth) * 0.7, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       },
-      update(){
+      update() {
         if (upPressed) this.y -= this.speedY;
         if (downPressed) this.y += this.speedY;
-        if (this.y < this.height/2) this.y = this.height/2;
-        if (this.y > canvas.height - this.height/2) this.y = canvas.height - this.height/2;
+        if (this.y < this.height / 2) this.y = this.height / 2;
+        if (this.y > canvas.height - this.height / 2) this.y = canvas.height - this.height / 2;
       }
     };
 
-    mageImage.onload = () => {
-      isMageLoaded = true;
-      const ratio = mageImage.width / mageImage.height;
-      wizardWidth = 100; wizardHeight = wizardWidth / ratio;
-      wizard.width = wizardWidth; wizard.height = wizardHeight;
-      if (isBackgroundLoaded) animateStartScreen();
-    };
-    mageImage.onerror = () => {
-      isMageLoaded = false; wizard.width = 60; wizard.height = 60;
-      if (isBackgroundLoaded) animateStartScreen();
-    };
-    backgroundImage.onload = () => { isBackgroundLoaded = true; if (isMageLoaded) animateStartScreen(); };
-    backgroundImage.onerror = () => { isBackgroundLoaded = false; if (isMageLoaded) animateStartScreen(); };
-
-    let walls = []; let wallSpeed = 4;
-
+    // Walls
+    let walls = [];
     class Wall {
-      constructor(){
-        this.width=30; this.x=canvas.width;
-        this.topHeight=Math.random()*(canvas.height/2)+50;
-        this.gap=250; this.color='#555'; this.passed=false;
-        this.initialY=this.topHeight; this.offsetY=Math.random()*100+50; this.speedY=(Math.random()-0.5)*2;
+      constructor() {
+        this.width = 30;
+        this.x = canvas.width;
+        this.topHeight = Math.random() * (canvas.height / 2) + 50;
+        this.gap = 250;
+        this.color = '#555';
+        this.passed = false;
+        this.initialY = this.topHeight;
+        this.offsetY = Math.random() * 100 + 50;
+        this.speedY = (Math.random() - 0.5) * 2;
       }
-      draw(){
-        ctx.fillStyle=this.color;
-        ctx.fillRect(this.x,0,this.width,this.topHeight);
-        const bottomY=this.topHeight+this.gap;
-        ctx.fillRect(this.x,bottomY,this.width,canvas.height-bottomY);
-        ctx.fillStyle='#333';
-        for(let i=0;i<this.topHeight;i+=15){ctx.fillRect(this.x,i,this.width,5)}
-        for(let i=this.topHeight+this.gap;i<canvas.height;i+=15){ctx.fillRect(this.x,i,this.width,5)}
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, 0, this.width, this.topHeight);
+        const bottomY = this.topHeight + this.gap;
+        ctx.fillRect(this.x, bottomY, this.width, canvas.height - bottomY);
+        ctx.fillStyle = '#333';
+        for (let i = 0; i < this.topHeight; i += 15) { ctx.fillRect(this.x, i, this.width, 5); }
+        for (let i = this.topHeight + this.gap; i < canvas.height; i += 15) { ctx.fillRect(this.x, i, this.width, 5); }
       }
-      update(){
-        this.x-=wallSpeed;
-        this.topHeight=this.initialY+Math.sin(frameCount*this.speedY/50)*this.offsetY;
-        if (!this.passed && this.x+this.width < wizard.x){ score++; scoreElement.textContent=score; this.passed=true; }
-        if (wizard.x + wizard.width/2 > this.x && wizard.x - wizard.width/2 < this.x + this.width){
-          if (wizard.y - wizard.height/2 < this.topHeight || wizard.y + wizard.height/2 > this.topHeight + this.gap){
+      update() {
+        this.x -= wallSpeed;
+        this.topHeight = this.initialY + Math.sin(frameCount * this.speedY / 50) * this.offsetY;
+        if (!this.passed && this.x + this.width < wizard.x) {
+          score++;
+          scoreElement.textContent = score;
+          this.passed = true;
+        }
+        if (wizard.x + wizard.width / 2 > this.x && wizard.x - wizard.width / 2 < this.x + this.width) {
+          if (wizard.y - wizard.height / 2 < this.topHeight || wizard.y + wizard.height / 2 > this.topHeight + this.gap) {
             gameOver();
           }
         }
       }
     }
 
-    function drawBackground(){
-      if (isBackgroundLoaded){
-        const ratio = backgroundImage.width / backgroundImage.height;
-        const imgH = canvas.height; const imgW = imgH*ratio;
-        backgroundX -= wallSpeed*0.5;
+    function drawBackground() {
+      if (isBackgroundLoaded) {
+        const ratio = backgroundImage.width / backgroundImage.height || 1;
+        const imgH = canvas.height;
+        const imgW = imgH * ratio;
+        backgroundX -= wallSpeed * 0.5;
         ctx.drawImage(backgroundImage, backgroundX, 0, imgW, imgH);
         ctx.drawImage(backgroundImage, backgroundX + imgW, 0, imgW, imgH);
         if (backgroundX <= -imgW) backgroundX = 0;
-        ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(0,0,0,.4)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else {
-        const g=ctx.createLinearGradient(0,0,canvas.width,0); g.addColorStop(0,'#8B0000'); g.addColorStop(1,'#000');
-        ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+        const g = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        g.addColorStop(0, '#8B0000');
+        g.addColorStop(1, '#000');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
 
-    function gameLoop(){
+    function gameLoop() {
       if (!gameRunning) return;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBackground();
-      wizard.update(); wizard.draw();
+      wizard.update();
+      wizard.draw();
 
-      if (score >= nextSpeedIncrease){
+      if (score >= nextSpeedIncrease) {
         wizard.speedY += 0.3; wallSpeed += 0.3; nextSpeedIncrease += 10;
-        speedUpText.style.display='block'; setTimeout(()=>speedUpText.style.display='none', 1000);
+        speedUpText.style.display = 'block'; setTimeout(() => speedUpText.style.display = 'none', 1000);
       }
 
-      const lastWall = walls[walls.length-1];
-      if (!lastWall || lastWall.x < canvas.width - wallDistance){ walls.push(new Wall()); }
-      for (let i=walls.length-1;i>=0;i--){ walls[i].update(); walls[i].draw(); if (walls[i].x + walls[i].width < 0) walls.splice(i,1); }
+      const lastWall = walls[walls.length - 1];
+      if (!lastWall || lastWall.x < canvas.width - wallDistance) { walls.push(new Wall()); }
+      for (let i = walls.length - 1; i >= 0; i--) { walls[i].update(); walls[i].draw(); if (walls[i].x + walls[i].width < 0) walls.splice(i, 1); }
 
       frameCount++; requestAnimationFrame(gameLoop);
     }
 
-    function startGame(){
+    function startGame() {
       gameRunning = true; score = 0; scoreElement.textContent = score;
-      walls = []; frameCount=0; wizard.speedY=7; wallSpeed=4; nextSpeedIncrease=10; backgroundX=0;
-      wizard.y = canvas.height/2;
-      startScreen.style.display='none';
-      gameOverScreen.style.display='none';
-      speedUpText.style.display='none';
-      leaderboardOverlay.style.display='none';
-      backgroundMusic.play().catch(()=>{});
+      walls = []; frameCount = 0; wizard.speedY = 7; wallSpeed = 4; nextSpeedIncrease = 10; backgroundX = 0;
+      wizard.y = canvas.height / 2;
+      startScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      speedUpText.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+      backgroundMusic.play().catch(() => {});
       gameLoop();
     }
 
-    async function gameOver(){
+    async function gameOver() {
       if (!gameRunning) return;
       gameRunning = false;
       backgroundMusic.currentTime = 0; backgroundMusic.pause();
-      if (loggedInUser){
-        try{
+      if (loggedInUser) {
+        try {
           const newHS = await submitScoreToServer(loggedInUser.id, score);
           if (typeof newHS === 'number') {
-            highScore = newHS;
-            localStorage.setItem('highScore', String(highScore));
-            highScoreElement.textContent = highScore;
+            highScore = newHS; localStorage.setItem('highScore', String(highScore)); highScoreElement.textContent = highScore;
           }
-        }catch(e){ console.error(e); }
+        } catch (e) { console.error(e); }
       } else {
-        if (score > highScore){ highScore = score; localStorage.setItem('highScore', String(highScore)); highScoreElement.textContent = highScore; }
+        if (score > highScore) { highScore = score; localStorage.setItem('highScore', String(highScore)); highScoreElement.textContent = highScore; }
       }
-      finalScoreElement.textContent = score;
-      finalHighScoreElement.textContent = highScore;
-      gameOverScreen.style.display='flex';
+      finalScoreElement.textContent = score; finalHighScoreElement.textContent = highScore;
+      gameOverScreen.style.display = 'flex';
       fetchLeaderboard();
     }
 
-    async function submitScoreToServer(userId, score){
-      const res = await fetch('/api/submit-score',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({userId, score})
-      });
+    async function submitScoreToServer(userId, score) {
+      const res = await fetch('/api/submit-score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, score }) });
       if (!res.ok) { console.error('Submit score failed:', res.statusText); return null; }
-      const data = await res.json();
-      return data.newHighScore;
+      const data = await res.json(); return data.newHighScore;
     }
 
-    async function fetchLeaderboard(){
-      try{
+    async function fetchLeaderboard() {
+      try {
         const res = await fetch('/api/leaderboard');
         if (!res.ok) { console.error('Failed to fetch leaderboard'); return; }
         const data = await res.json();
@@ -322,31 +352,48 @@
           ul.innerHTML = '';
           data.forEach((p, i) => {
             const li = document.createElement('li');
-            li.innerHTML = `<span class="${loggedInUser && loggedInUser.id===p.id?'highlight':''}">${i+1}. ${p.username}</span><span>${p.score}</span>`;
+            li.innerHTML = `<span class="${loggedInUser && loggedInUser.id === p.id ? 'highlight' : ''}">${i + 1}. ${p.username || p.id}</span><span>${p.score}</span>`;
             ul.appendChild(li);
           });
         };
-        renderTo(leaderboardListOverlay);
-        renderTo(leaderboardListStart);
-        renderTo(leaderboardListGameOver);
-      }catch(e){ console.error('Leaderboard error:',e); }
+        renderTo(leaderboardListOverlay); renderTo(leaderboardListStart); renderTo(leaderboardListGameOver);
+      } catch (e) { console.error('Leaderboard error:', e); }
     }
 
-    function animateStartScreen(){ if (!gameRunning && startScreen.style.display!=='none'){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(); wizard.draw(); requestAnimationFrame(animateStartScreen);} }
+    function animateStartScreen() {
+      if (!gameRunning && startScreen.style.display !== 'none') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground(); wizard.draw();
+        requestAnimationFrame(animateStartScreen);
+      }
+    }
 
-    discordLoginButton.addEventListener('click',()=>{ window.location.href='/api/login/discord'; });
+    // events
+    discordLoginButton.addEventListener('click', () => { window.location.href = '/api/login/discord'; });
     startButton.addEventListener('click', startGame);
     restartButton.addEventListener('click', startGame);
 
-    window.addEventListener('keydown',(e)=>{ if (e.code==='ArrowUp'||e.code==='KeyW') upPressed=true; if (e.code==='ArrowDown'||e.code==='KeyS') downPressed=true; });
-    window.addEventListener('keyup',(e)=>{ if (e.code==='ArrowUp'||e.code==='KeyW') upPressed=false; if (e.code==='ArrowDown'||e.code==='KeyS') downPressed=false; });
-    canvas.addEventListener('touchstart',(e)=>{ const touchY=e.touches[0].clientY; upPressed=(touchY<window.innerHeight/2); downPressed=!upPressed; e.preventDefault(); });
-    canvas.addEventListener('touchend',()=>{ upPressed=false; downPressed=false; });
+    window.addEventListener('keydown', (e) => { if (e.code === 'ArrowUp' || e.code === 'KeyW') upPressed = true; if (e.code === 'ArrowDown' || e.code === 'KeyS') downPressed = true; });
+    window.addEventListener('keyup', (e) => { if (e.code === 'ArrowUp' || e.code === 'KeyW') upPressed = false; if (e.code === 'ArrowDown' || e.code === 'KeyS') downPressed = false; });
 
-    function resizeCanvas(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; wizard.y=canvas.height/2; }
-    window.addEventListener('resize',resizeCanvas); resizeCanvas();
+    canvas.addEventListener('touchstart', (e) => { const touchY = e.touches[0].clientY; upPressed = (touchY < window.innerHeight / 2); downPressed = !upPressed; e.preventDefault(); });
+    canvas.addEventListener('touchend', () => { upPressed = false; downPressed = false; });
 
-    animateStartScreen();
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      wizard.x = canvas.width / 4;
+      wizard.y = canvas.height / 2;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // run initialization after DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      fetchLeaderboard().catch(()=>{});
+      // If images already loaded by the time DOMContentLoaded runs, start animation.
+      if (isMageLoaded || isBackgroundLoaded) animateStartScreen();
+    });
   </script>
 </body>
 </html>
