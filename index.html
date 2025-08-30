@@ -26,7 +26,6 @@
     .magic-effect{position:absolute;pointer-events:none;z-index:5}
     #speed-up-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;color:#fff;text-shadow:0 0 10px #00f,0 0 20px #00f;animation:fadeOut 1s forwards;display:none;z-index:30}
     @keyframes fadeOut{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
-    /* Box leaderboard reusable */
     .leaderboard-box{width:260px;background:rgba(0,0,0,.7);padding:15px;border-radius:10px;color:#fff;text-shadow:1px 1px 2px #000}
     .leaderboard-box h3{text-align:center;margin-bottom:10px}
     .lb-list{list-style:none;padding:0;width:100%}
@@ -42,7 +41,6 @@
       <div class="score-container"><h3>High Score: <span id="high-score">0</span></h3></div>
     </div>
 
-    <!-- overlay leaderboard di start -->
     <div id="leaderboard-container">
       <h3>Top 10 Scores</h3>
       <ol id="leaderboard-list"></ol>
@@ -50,7 +48,6 @@
 
     <div id="speed-up-text">SPEED UP!</div>
 
-    <!-- START SCREEN -->
     <div class="start-screen" id="start-screen">
       <h1 id="start-title">Flying Wizard</h1>
       <p id="welcome-message" style="display:none;"></p>
@@ -61,15 +58,12 @@
       </div>
       <button id="discord-login-button">Login with Discord</button>
       <button id="start-button" style="display:none;">Mulai Game</button>
-
-      <!-- leaderboard juga di start (versi box di bawah tombol) -->
       <div class="leaderboard-box" style="margin-top:20px;">
         <h3>Leaderboard</h3>
         <ol id="leaderboard-list-start" class="lb-list"></ol>
       </div>
     </div>
 
-    <!-- GAME OVER + LEADERBOARD SAMPING -->
     <div class="game-over-screen" id="game-over-screen">
       <div class="game-over-content">
         <h2>Game Over!</h2>
@@ -97,7 +91,6 @@
 
     const startScreen = document.getElementById('start-screen');
     const gameOverScreen = document.getElementById('game-over-screen');
-
     const startButton = document.getElementById('start-button');
     const discordLoginButton = document.getElementById('discord-login-button');
     const restartButton = document.getElementById('restart-button');
@@ -122,13 +115,11 @@
     let score = 0;
     let highScore = Number(localStorage.getItem('highScore') || 0);
     highScoreElement.textContent = highScore;
-
     let frameCount = 0;
     const wallDistance = 300;
     let nextSpeedIncrease = 10;
     let loggedInUser = null;
 
-    // --- OAuth params dari server
     const urlParams = new URLSearchParams(window.location.search);
     const username = urlParams.get('username');
     const userId = urlParams.get('id');
@@ -139,7 +130,6 @@
       highScore = fetchedHighScore ? parseInt(fetchedHighScore, 10) : 0;
       localStorage.setItem('highScore', String(highScore));
       highScoreElement.textContent = highScore;
-
       discordLoginButton.style.display = 'none';
       startButton.style.display = 'block';
       startTitle.style.display = 'none';
@@ -152,16 +142,54 @@
       leaderboardOverlay.style.display = 'none';
     }
 
-    // --- Input
     let upPressed = false, downPressed = false;
 
-    // --- Assets (dari /public)
-    const mageImage = new Image(); mageImage.src = '/mage.png';
+    // 🔧 FIX: tambahkan crossOrigin sebelum set src
+    const mageImage = new Image();
+    mageImage.crossOrigin = "anonymous";
+    mageImage.src = '/mage.png';
     let isMageLoaded = false;
     let wizardWidth = 50, wizardHeight = 50;
 
-    const backgroundImage = new Image(); backgroundImage.src = '/island.png';
+    const backgroundImage = new Image();
+    backgroundImage.crossOrigin = "anonymous";
+    backgroundImage.src = '/island.png';
     let isBackgroundLoaded = false, backgroundX = 0;
+
+    const wizard = {
+      x: 100, y: canvas.height/2, width: wizardWidth, height: wizardHeight, speedY: 7,
+      draw(){
+        const hover = Math.sin(frameCount*0.1)*5;
+        if (isMageLoaded){
+          ctx.drawImage(mageImage, this.x - this.width/2, this.y - this.height/2 + hover, this.width, this.height);
+        } else {
+          ctx.fillStyle='#9c27b0';
+          ctx.beginPath();
+          ctx.arc(this.x, this.y+hover, this.width/2, 0, Math.PI*2);
+          ctx.fill();
+          ctx.fillStyle='#4a148c';
+          ctx.beginPath();
+          ctx.moveTo(this.x - this.width/2, this.y+hover - 15);
+          ctx.lineTo(this.x + this.width/2, this.y+hover - 15);
+          ctx.lineTo(this.x, this.y+hover - 40);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.save();
+        ctx.filter='blur(8px)';
+        ctx.fillStyle='rgba(255,255,255,.3)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y+hover, this.width*0.7, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      },
+      update(){
+        if (upPressed) this.y -= this.speedY;
+        if (downPressed) this.y += this.speedY;
+        if (this.y < this.height/2) this.y = this.height/2;
+        if (this.y > canvas.height - this.height/2) this.y = canvas.height - this.height/2;
+      }
+    };
 
     mageImage.onload = () => {
       isMageLoaded = true;
@@ -174,32 +202,8 @@
       isMageLoaded = false; wizard.width = 60; wizard.height = 60;
       if (isBackgroundLoaded) animateStartScreen();
     };
-
     backgroundImage.onload = () => { isBackgroundLoaded = true; if (isMageLoaded) animateStartScreen(); };
     backgroundImage.onerror = () => { isBackgroundLoaded = false; if (isMageLoaded) animateStartScreen(); };
-
-    // --- Entity
-    const wizard = {
-      x: 100, y: canvas.height/2, width: wizardWidth, height: wizardHeight, speedY: 7,
-      draw(){
-        const hover = Math.sin(frameCount*0.1)*5;
-        if (isMageLoaded){
-          ctx.drawImage(mageImage, this.x - this.width/2, this.y - this.height/2 + hover, this.width, this.height);
-        } else {
-          ctx.fillStyle='#9c27b0'; ctx.beginPath(); ctx.arc(this.x, this.y+hover, this.width/2, 0, Math.PI*2); ctx.fill();
-          ctx.fillStyle='#4a148c'; ctx.beginPath(); ctx.moveTo(this.x - this.width/2, this.y+hover - 15);
-          ctx.lineTo(this.x + this.width/2, this.y+hover - 15); ctx.lineTo(this.x, this.y+hover - 40); ctx.closePath(); ctx.fill();
-        }
-        ctx.save(); ctx.filter='blur(8px)'; ctx.fillStyle='rgba(255,255,255,.3)';
-        ctx.beginPath(); ctx.arc(this.x, this.y+hover, this.width*0.7, 0, Math.PI*2); ctx.fill(); ctx.restore();
-      },
-      update(){
-        if (upPressed) this.y -= this.speedY;
-        if (downPressed) this.y += this.speedY;
-        if (this.y < this.height/2) this.y = this.height/2;
-        if (this.y > canvas.height - this.height/2) this.y = canvas.height - this.height/2;
-      }
-    };
 
     let walls = []; let wallSpeed = 4;
 
@@ -280,7 +284,6 @@
       if (!gameRunning) return;
       gameRunning = false;
       backgroundMusic.currentTime = 0; backgroundMusic.pause();
-
       if (loggedInUser){
         try{
           const newHS = await submitScoreToServer(loggedInUser.id, score);
@@ -293,13 +296,10 @@
       } else {
         if (score > highScore){ highScore = score; localStorage.setItem('highScore', String(highScore)); highScoreElement.textContent = highScore; }
       }
-
       finalScoreElement.textContent = score;
       finalHighScoreElement.textContent = highScore;
-
-      // tampilkan layar game over + leaderboard samping
       gameOverScreen.style.display='flex';
-      fetchLeaderboard(); // refresh ranking terkini
+      fetchLeaderboard();
     }
 
     async function submitScoreToServer(userId, score){
@@ -310,7 +310,6 @@
       });
       if (!res.ok) { console.error('Submit score failed:', res.statusText); return null; }
       const data = await res.json();
-      // server mengembalikan { newHighScore: number }
       return data.newHighScore;
     }
 
@@ -318,83 +317,36 @@
       try{
         const res = await fetch('/api/leaderboard');
         if (!res.ok) { console.error('Failed to fetch leaderboard'); return; }
-        const data = await res.json(); // [{id, username, score}, ...]
-
-        // Siapkan helper render agar DRY
+        const data = await res.json();
         const renderTo = (ul) => {
           ul.innerHTML = '';
           data.forEach((p, i) => {
             const li = document.createElement('li');
-            const name = p.username || p.id; // fallback jika server belum kirim username
-            li.textContent = `${i+1}. ${name}`;
-            const span = document.createElement('span'); span.textContent = p.score;
-            li.appendChild(span);
-            if (loggedInUser && p.id === loggedInUser.id) li.classList.add('highlight');
+            li.innerHTML = `<span class="${loggedInUser && loggedInUser.id===p.id?'highlight':''}">${i+1}. ${p.username}</span><span>${p.score}</span>`;
             ul.appendChild(li);
           });
         };
-
-        // overlay pojok kanan (kalau dipakai), start screen box, dan gameover box
         renderTo(leaderboardListOverlay);
         renderTo(leaderboardListStart);
         renderTo(leaderboardListGameOver);
-      } catch(err){ console.error('Error fetching leaderboard:', err); }
+      }catch(e){ console.error('Leaderboard error:',e); }
     }
 
-    // --- Controls
+    function animateStartScreen(){ if (!gameRunning && startScreen.style.display!=='none'){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(); wizard.draw(); requestAnimationFrame(animateStartScreen);} }
+
+    discordLoginButton.addEventListener('click',()=>{ window.location.href='/api/login/discord'; });
     startButton.addEventListener('click', startGame);
-    restartButton.addEventListener('click', () => {
-      startGame();
-      if (loggedInUser) fetchLeaderboard();
-    });
-    discordLoginButton.addEventListener('click', () => { window.location.href = '/api/login/discord'; });
+    restartButton.addEventListener('click', startGame);
 
-    document.addEventListener('keydown', (e) => {
-      const k = e.key ? e.key.toLowerCase() : '';
-      if (e.code === 'ArrowUp' || k === 'w') upPressed = true;
-      if (e.code === 'ArrowDown' || k === 's') downPressed = true;
-      if (!gameRunning && startScreen.style.display !== 'none' && startButton.style.display !== 'none'){
-        if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || k === 'w' || k === 's') startGame();
-      }
-    });
-    document.addEventListener('keyup', (e) => {
-      const k = e.key ? e.key.toLowerCase() : '';
-      if (e.code === 'ArrowUp' || k === 'w') upPressed = false;
-      if (e.code === 'ArrowDown' || k === 's') downPressed = false;
-    });
-
-    canvas.addEventListener('touchstart',(e)=>{
-      e.preventDefault();
-      if (!gameRunning && startButton.style.display !== 'none'){ startGame(); return; }
-      const rect = canvas.getBoundingClientRect();
-      const touchY = e.touches[0].clientY - rect.top;
-      if (touchY < canvas.height/2){ upPressed = true; downPressed = false; }
-      else { downPressed = true; upPressed = false; }
-    }, {passive:false});
+    window.addEventListener('keydown',(e)=>{ if (e.code==='ArrowUp'||e.code==='KeyW') upPressed=true; if (e.code==='ArrowDown'||e.code==='KeyS') downPressed=true; });
+    window.addEventListener('keyup',(e)=>{ if (e.code==='ArrowUp'||e.code==='KeyW') upPressed=false; if (e.code==='ArrowDown'||e.code==='KeyS') downPressed=false; });
+    canvas.addEventListener('touchstart',(e)=>{ const touchY=e.touches[0].clientY; upPressed=(touchY<window.innerHeight/2); downPressed=!upPressed; e.preventDefault(); });
     canvas.addEventListener('touchend',()=>{ upPressed=false; downPressed=false; });
 
-    function animateStartScreen(){
-      if (!gameRunning && startScreen.style.display !== 'none'){
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        drawBackground(); wizard.draw(); frameCount++; requestAnimationFrame(animateStartScreen);
-      }
-    }
+    function resizeCanvas(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; wizard.y=canvas.height/2; }
+    window.addEventListener('resize',resizeCanvas); resizeCanvas();
 
-    function resizeCanvas(){
-      const container = document.querySelector('.game-container');
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      wizard.x = canvas.width/4;
-      wizard.y = canvas.height/2;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      resizeCanvas();
-      animateStartScreen();
-      // Tampilkan leaderboard di start/gameover; overlay kanan muncul jika login
-      fetchLeaderboard();
-    });
-    window.addEventListener('resize', resizeCanvas);
+    animateStartScreen();
   </script>
 </body>
 </html>
