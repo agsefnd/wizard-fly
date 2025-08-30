@@ -7,15 +7,20 @@ const fetch = require('node-fetch');
 
 const app = express();
 
-// middleware
+// Middleware
 app.use(bodyParser.json());
 app.use(session({
   secret: 'wizard-secret',
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: true,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',  // Only send cookies over HTTPS in production
+    httpOnly: true,
+    sameSite: 'strict',  // Protect against CSRF
+  },
 }));
 
-// in-memory scores
+// In-memory scores
 const scores = {};
 
 // Discord OAuth config
@@ -26,17 +31,16 @@ const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API routes
+// API Routes
 app.get('/api/login/discord', (req, res) => {
-  const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-    REDIRECT_URI
-  )}&response_type=code&scope=identify`;
+  const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
   res.redirect(redirect);
 });
 
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No code provided');
+  
   try {
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -49,17 +53,27 @@ app.get('/api/callback', async (req, res) => {
         redirect_uri: REDIRECT_URI,
       }),
     });
+
     const tokenData = await tokenResponse.json();
+    if (tokenData.error) {
+      console.error('OAuth Error:', tokenData.error);
+      return res.status(500).send('OAuth token exchange failed');
+    }
+
+    if (!tokenData.access_token) {
+      console.error('No access token received');
+      return res.status(500).send('Token exchange failed');
+    }
 
     const userResponse = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const user = await userResponse.json();
-    
+
     req.session.userId = user.id;
     req.session.username = user.username;
-    
-    res.redirect('/');
+
+    res.redirect('/');  // Redirect ke halaman utama
   } catch (err) {
     console.error('Callback error:', err);
     res.status(500).send('Auth failed');
@@ -67,24 +81,24 @@ app.get('/api/callback', async (req, res) => {
 });
 
 app.get('/api/user', (req, res) => {
-    if (req.session.userId) {
-        return res.json({
-            id: req.session.userId,
-            username: req.session.username,
-        });
-    }
-    res.status(401).json({ message: 'User not logged in' });
+  if (req.session.userId) {
+    return res.json({
+      id: req.session.userId,
+      username: req.session.username,
+    });
+  }
+  res.status(401).json({ message: 'User not logged in' });
 });
 
 app.post('/api/submit-score', (req, res) => {
   const { score } = req.body;
   const userId = req.session.userId;
   const username = req.session.username;
-  
+
   if (!userId || !username) {
     return res.status(401).json({ message: 'User not authenticated' });
   }
-  
+
   if (!scores[userId] || score > scores[userId].score) {
     scores[userId] = { username: username, score: score };
   }
@@ -98,12 +112,10 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
-// Fallback route to serve the main HTML file for any non-API requests
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Vercel's entry point handler
 module.exports = app;
 
 if (require.main === module) {
