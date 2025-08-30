@@ -26,7 +26,7 @@ const scores = {};
 // Discord OAuth config
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/api/callback';
+const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly-qiyc.vercel.app/callback';
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
