@@ -1,120 +1,96 @@
-const express = require('express');
-const axios = require('axios');
-const { sql } = require('@vercel/postgres');
 require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const bodyParser = require('body-parser');
+const path = require('path');
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json());
+app.use(session({ secret: 'wizard-secret', resave: false, saveUninitialized: true }));
 
-const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env;
+// Simpan skor di memori
+// Format: { userId: { username, score } }
+const scores = {};
 
-// Fungsi untuk membuat tabel (akan dijalankan secara otomatis oleh Vercel)
-async function createTables() {
-    try {
-        await sql`
-            CREATE TABLE IF NOT EXISTS users (
-                discord_id VARCHAR(255) PRIMARY KEY,
-                username VARCHAR(255) NOT NULL,
-                high_score INT DEFAULT 0
-            );
-        `;
-        console.log('User table created or already exists.');
-    } catch (err) {
-        console.error('Error creating user table:', err.stack);
-    }
-}
-createTables();
+// Discord OAuth config
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:3000/api/callback';
 
-// --- API ENDPOINTS ---
+// Serve file statis (HTML, CSS, JS, gambar)
+app.use(express.static(path.join(__dirname)));
 
+// Serve index.html saat akses root /
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Login via Discord
 app.get('/api/login/discord', (req, res) => {
-    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
-    res.redirect(authUrl);
+  const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+    REDIRECT_URI
+  )}&response_type=code&scope=identify`;
+  res.redirect(redirect);
 });
 
-app.get('/api/auth/discord/callback', async (req, res) => {
-    const { code } = req.query;
-    if (!code) {
-        return res.status(400).send('No code provided.');
-    }
+// Callback dari Discord
+app.get('/api/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.send('No code provided');
 
-    try {
-        const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: REDIRECT_URI,
-            scope: 'identify'
-        }), {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
+  // Tukar code dengan access_token
+  const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT_URI,
+    }),
+  });
+  const tokenData = await tokenResponse.json();
 
-        const { access_token } = tokenResponse.data;
-        const userResponse = await axios.get('https://discord.com/api/v10/users/@me', {
-            headers: {
-                'Authorization': `Bearer ${access_token}`
-            }
-        });
+  // Ambil data user
+  const userResponse = await fetch('https://discord.com/api/users/@me', {
+    headers: { Authorization: `Bearer ${tokenData.access_token}` },
+  });
+  const user = await userResponse.json();
 
-        const user = userResponse.data;
-        
-        const result = await sql`
-            INSERT INTO users (discord_id, username) 
-            VALUES (${user.id}, ${user.username}) 
-            ON CONFLICT (discord_id) DO UPDATE SET username = ${user.username}
-            RETURNING high_score;
-        `;
-        const userHighScore = result.rows[0].high_score;
+  // Simpan user dengan skor awal (0 jika belum ada)
+  const highScore = scores[user.id]?.score || 0;
+  scores[user.id] = { username: user.username, score: highScore };
 
-        res.redirect(`/?username=${encodeURIComponent(user.username)}&id=${user.id}&highScore=${userHighScore}`);
-
-    } catch (error) {
-        console.error('Error during Discord auth:', error.response?.data || error.message);
-        res.status(500).send('Authentication failed.');
-    }
+  // Redirect balik ke game dengan data user
+  res.redirect(
+    `/index.html?username=${encodeURIComponent(user.username)}&id=${user.id}&highScore=${highScore}`
+  );
 });
 
-app.post('/api/submit-score', async (req, res) => {
-    const { userId, score } = req.body;
-    if (!userId || typeof score === 'undefined') {
-        return res.status(400).send('Invalid data provided.');
-    }
+// Submit skor (update hanya jika lebih tinggi)
+app.post('/api/submit-score', (req, res) => {
+  const { userId, score } = req.body;
 
-    try {
-        const result = await sql`SELECT high_score FROM users WHERE discord_id = ${userId};`;
-        const currentHighScore = result.rows.length > 0 ? result.rows[0].high_score : 0;
+  if (!scores[userId]) {
+    scores[userId] = { username: "Player", score };
+  }
 
-        let newHighScore = currentHighScore;
-        if (score > currentHighScore) {
-            newHighScore = score;
-            await sql`
-                UPDATE users SET high_score = ${newHighScore} WHERE discord_id = ${userId};
-            `;
-        }
-        res.json({ newHighScore: newHighScore });
-    } catch (error) {
-        console.error('Error submitting score:', error);
-        res.status(500).send('Error submitting score.');
-    }
+  if (score > scores[userId].score) {
+    scores[userId].score = score;
+  }
+
+  res.json({ newHighScore: scores[userId].score });
 });
 
-app.get('/api/leaderboard', async (req, res) => {
-    try {
-        const result = await sql`
-            SELECT username, high_score FROM users ORDER BY high_score DESC LIMIT 10;
-        `;
-        const leaderboardData = result.rows.map(row => ({
-            username: row.username,
-            score: row.high_score
-        }));
-        res.json(leaderboardData);
-    } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        res.status(500).send('Error fetching leaderboard.');
-    }
+// Ambil leaderboard (Top 10)
+app.get('/api/leaderboard', (req, res) => {
+  const leaderboard = Object.entries(scores)
+    .map(([id, data]) => ({ id, username: data.username, score: data.score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  res.json(leaderboard);
 });
 
-module.exports = app;
+app.listen(3000, () => console.log('✅ Server running on http://localhost:3000'));

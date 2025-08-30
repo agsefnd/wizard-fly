@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flying Wizard - Game</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+    body{background:#000;min-height:100vh;display:flex;justify-content:center;align-items:center;overflow:hidden}
+    .game-container{position:relative;width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;overflow:hidden}
+    canvas{background:#1a1a1a;display:block;touch-action:none;width:100%;height:100%;position:absolute;top:0;left:0;z-index:1}
+    .ui-container{position:absolute;top:0;left:0;width:100%;padding:20px;color:#fff;display:flex;justify-content:space-between;z-index:10;text-shadow:1px 1px 2px #000}
+    .score-container{background:rgba(0,0,0,.5);padding:10px 20px;border-radius:20px;backdrop-filter:blur(5px)}
+    .start-screen,.game-over-screen{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,.7);color:#fff;z-index:20;padding:20px}
+    .game-over-screen{display:none;flex-direction:row;gap:40px;justify-content:center;align-items:flex-start}
+    #leaderboard-container{position:absolute;top:20px;right:20px;width:250px;background:rgba(0,0,0,.7);padding:15px;border-radius:10px;color:#fff;display:none;flex-direction:column;align-items:center;z-index:15;text-shadow:1px 1px 2px #000}
+    #leaderboard-container h3{margin-bottom:10px}
+    #leaderboard-list{list-style:none;padding:0;width:100%}
+    #leaderboard-list li{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.2);display:flex;justify-content:space-between}
+    h1{font-size:3rem;margin-bottom:20px;text-shadow:0 0 10px #ff00ff,0 0 20px #ff00ff;color:#fff}
+    h2{font-size:2rem;margin-bottom:30px;color:#ffcc00}
+    button{padding:15px 30px;font-size:1.2rem;background:linear-gradient(to right,#ff0080,#ff8c00);color:#fff;border:none;border-radius:50px;cursor:pointer;margin:10px;transition:.3s;box-shadow:0 5px 15px rgba(0,0,0,.3)}
+    button:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.4);background:linear-gradient(to right,#ff0080,#ffcc00)}
+    .instructions{max-width:90%;text-align:center;margin:20px 0;line-height:1.6;font-size:1rem}
+    .key{display:inline-block;padding:2px 8px;background:rgba(255,255,255,.2);border-radius:5px;font-weight:bold}
+    .magic-effect{position:absolute;pointer-events:none;z-index:5}
+    #speed-up-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;color:#fff;text-shadow:0 0 10px #00f,0 0 20px #00f;animation:fadeOut 1s forwards;display:none;z-index:30}
+    @keyframes fadeOut{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
+    /* Box leaderboard reusable */
+    .leaderboard-box{width:260px;background:rgba(0,0,0,.7);padding:15px;border-radius:10px;color:#fff;text-shadow:1px 1px 2px #000}
+    .leaderboard-box h3{text-align:center;margin-bottom:10px}
+    .lb-list{list-style:none;padding:0;width:100%}
+    .lb-list li{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.2);display:flex;justify-content:space-between}
+    .highlight{color:#ffcc00;font-weight:bold}
+    .game-over-content{max-width:420px;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="ui-container">
+      <div class="score-container"><h3>Score: <span id="score">0</span></h3></div>
+      <div class="score-container"><h3>High Score: <span id="high-score">0</span></h3></div>
+    </div>
+
+    <!-- overlay leaderboard di start -->
+    <div id="leaderboard-container">
+      <h3>Top 10 Scores</h3>
+      <ol id="leaderboard-list"></ol>
+    </div>
+
+    <div id="speed-up-text">SPEED UP!</div>
+
+    <!-- START SCREEN -->
+    <div class="start-screen" id="start-screen">
+      <h1 id="start-title">Flying Wizard</h1>
+      <p id="welcome-message" style="display:none;"></p>
+      <div class="instructions">
+        <p>Terbangkan penyihir melewati rintangan!</p>
+        <p>Desktop: <span class="key">▲</span>/<span class="key">▼</span> atau <span class="key">W</span>/<span class="key">S</span></p>
+        <p>Ponsel: Sentuh bagian atas/bawah layar untuk naik/turun.</p>
+      </div>
+      <button id="discord-login-button">Login with Discord</button>
+      <button id="start-button" style="display:none;">Mulai Game</button>
+
+      <!-- leaderboard juga di start (versi box di bawah tombol) -->
+      <div class="leaderboard-box" style="margin-top:20px;">
+        <h3>Leaderboard</h3>
+        <ol id="leaderboard-list-start" class="lb-list"></ol>
+      </div>
+    </div>
+
+    <!-- GAME OVER + LEADERBOARD SAMPING -->
+    <div class="game-over-screen" id="game-over-screen">
+      <div class="game-over-content">
+        <h2>Game Over!</h2>
+        <p class="instructions">Skor Akhir: <span id="final-score">0</span></p>
+        <p class="instructions">Skor Tertinggi: <span id="final-high-score">0</span></p>
+        <button id="restart-button">Main Lagi</button>
+      </div>
+      <div class="leaderboard-box">
+        <h3>Leaderboard</h3>
+        <ol id="gameover-leaderboard-list" class="lb-list"></ol>
+      </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <audio id="background-music" loop>
+    <source src="efek.mp3" type="audio/mpeg"/>
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+
+    const startButton = document.getElementById('start-button');
+    const discordLoginButton = document.getElementById('discord-login-button');
+    const restartButton = document.getElementById('restart-button');
+
+    const scoreElement = document.getElementById('score');
+    const highScoreElement = document.getElementById('high-score');
+    const finalScoreElement = document.getElementById('final-score');
+    const finalHighScoreElement = document.getElementById('final-high-score');
+
+    const speedUpText = document.getElementById('speed-up-text');
+    const backgroundMusic = document.getElementById('background-music');
+
+    const leaderboardOverlay = document.getElementById('leaderboard-container');
+    const leaderboardListOverlay = document.getElementById('leaderboard-list');
+    const leaderboardListStart = document.getElementById('leaderboard-list-start');
+    const leaderboardListGameOver = document.getElementById('gameover-leaderboard-list');
+
+    const welcomeMessage = document.getElementById('welcome-message');
+    const startTitle = document.getElementById('start-title');
+
+    let gameRunning = false;
+    let score = 0;
+    let highScore = Number(localStorage.getItem('highScore') || 0);
+    highScoreElement.textContent = highScore;
+
+    let frameCount = 0;
+    const wallDistance = 300;
+    let nextSpeedIncrease = 10;
+    let loggedInUser = null;
+
+    // --- OAuth params dari server
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    const userId = urlParams.get('id');
+    const fetchedHighScore = urlParams.get('highScore');
+
+    if (username && userId) {
+      loggedInUser = { id: userId, username };
+      highScore = fetchedHighScore ? parseInt(fetchedHighScore, 10) : 0;
+      localStorage.setItem('highScore', String(highScore));
+      highScoreElement.textContent = highScore;
+
+      discordLoginButton.style.display = 'none';
+      startButton.style.display = 'block';
+      startTitle.style.display = 'none';
+      welcomeMessage.style.display = 'block';
+      welcomeMessage.textContent = `Welcome, ${username}!`;
+      leaderboardOverlay.style.display = 'flex';
+    } else {
+      discordLoginButton.style.display = 'block';
+      startButton.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+    }
+
+    // --- Input
+    let upPressed = false, downPressed = false;
+
+    // --- Assets
+    const mageImage = new Image(); mageImage.src = 'mage.png';
+    let isMageLoaded = false;
+    let wizardWidth = 50, wizardHeight = 50;
+
+    const backgroundImage = new Image(); backgroundImage.src = 'island.png';
+    let isBackgroundLoaded = false, backgroundX = 0;
+
+    mageImage.onload = () => {
+      isMageLoaded = true;
+      const ratio = mageImage.width / mageImage.height;
+      wizardWidth = 100; wizardHeight = wizardWidth / ratio;
+      wizard.width = wizardWidth; wizard.height = wizardHeight;
+      if (isBackgroundLoaded) animateStartScreen();
+    };
+    mageImage.onerror = () => {
+      isMageLoaded = false; wizard.width = 60; wizard.height = 60;
+      if (isBackgroundLoaded) animateStartScreen();
+    };
+
+    backgroundImage.onload = () => { isBackgroundLoaded = true; if (isMageLoaded) animateStartScreen(); };
+    backgroundImage.onerror = () => { isBackgroundLoaded = false; if (isMageLoaded) animateStartScreen(); };
+
+    // --- Entity
+    const wizard = {
+      x: 100, y: canvas.height/2, width: wizardWidth, height: wizardHeight, speedY: 7,
+      draw(){
+        const hover = Math.sin(frameCount*0.1)*5;
+        if (isMageLoaded){
+          ctx.drawImage(mageImage, this.x - this.width/2, this.y - this.height/2 + hover, this.width, this.height);
+        } else {
+          ctx.fillStyle='#9c27b0'; ctx.beginPath(); ctx.arc(this.x, this.y+hover, this.width/2, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle='#4a148c'; ctx.beginPath(); ctx.moveTo(this.x - this.width/2, this.y+hover - 15);
+          ctx.lineTo(this.x + this.width/2, this.y+hover - 15); ctx.lineTo(this.x, this.y+hover - 40); ctx.closePath(); ctx.fill();
+        }
+        ctx.save(); ctx.filter='blur(8px)'; ctx.fillStyle='rgba(255,255,255,.3)';
+        ctx.beginPath(); ctx.arc(this.x, this.y+hover, this.width*0.7, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      },
+      update(){
+        if (upPressed) this.y -= this.speedY;
+        if (downPressed) this.y += this.speedY;
+        if (this.y < this.height/2) this.y = this.height/2;
+        if (this.y > canvas.height - this.height/2) this.y = canvas.height - this.height/2;
+      }
+    };
+
+    let walls = []; let wallSpeed = 4;
+
+    class Wall {
+      constructor(){
+        this.width=30; this.x=canvas.width;
+        this.topHeight=Math.random()*(canvas.height/2)+50;
+        this.gap=250; this.color='#555'; this.passed=false;
+        this.initialY=this.topHeight; this.offsetY=Math.random()*100+50; this.speedY=(Math.random()-0.5)*2;
+      }
+      draw(){
+        ctx.fillStyle=this.color;
+        ctx.fillRect(this.x,0,this.width,this.topHeight);
+        const bottomY=this.topHeight+this.gap;
+        ctx.fillRect(this.x,bottomY,this.width,canvas.height-bottomY);
+        ctx.fillStyle='#333';
+        for(let i=0;i<this.topHeight;i+=15){ctx.fillRect(this.x,i,this.width,5)}
+        for(let i=this.topHeight+this.gap;i<canvas.height;i+=15){ctx.fillRect(this.x,i,this.width,5)}
+      }
+      update(){
+        this.x-=wallSpeed;
+        this.topHeight=this.initialY+Math.sin(frameCount*this.speedY/50)*this.offsetY;
+        if (!this.passed && this.x+this.width < wizard.x){ score++; scoreElement.textContent=score; this.passed=true; }
+        if (wizard.x + wizard.width/2 > this.x && wizard.x - wizard.width/2 < this.x + this.width){
+          if (wizard.y - wizard.height/2 < this.topHeight || wizard.y + wizard.height/2 > this.topHeight + this.gap){
+            gameOver();
+          }
+        }
+      }
+    }
+
+    function drawBackground(){
+      if (isBackgroundLoaded){
+        const ratio = backgroundImage.width / backgroundImage.height;
+        const imgH = canvas.height; const imgW = imgH*ratio;
+        backgroundX -= wallSpeed*0.5;
+        ctx.drawImage(backgroundImage, backgroundX, 0, imgW, imgH);
+        ctx.drawImage(backgroundImage, backgroundX + imgW, 0, imgW, imgH);
+        if (backgroundX <= -imgW) backgroundX = 0;
+        ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      } else {
+        const g=ctx.createLinearGradient(0,0,canvas.width,0); g.addColorStop(0,'#8B0000'); g.addColorStop(1,'#000');
+        ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+      }
+    }
+
+    function gameLoop(){
+      if (!gameRunning) return;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      drawBackground();
+      wizard.update(); wizard.draw();
+
+      if (score >= nextSpeedIncrease){
+        wizard.speedY += 0.3; wallSpeed += 0.3; nextSpeedIncrease += 10;
+        speedUpText.style.display='block'; setTimeout(()=>speedUpText.style.display='none', 1000);
+      }
+
+      const lastWall = walls[walls.length-1];
+      if (!lastWall || lastWall.x < canvas.width - wallDistance){ walls.push(new Wall()); }
+      for (let i=walls.length-1;i>=0;i--){ walls[i].update(); walls[i].draw(); if (walls[i].x + walls[i].width < 0) walls.splice(i,1); }
+
+      frameCount++; requestAnimationFrame(gameLoop);
+    }
+
+    function startGame(){
+      gameRunning = true; score = 0; scoreElement.textContent = score;
+      walls = []; frameCount=0; wizard.speedY=7; wallSpeed=4; nextSpeedIncrease=10; backgroundX=0;
+      wizard.y = canvas.height/2;
+      startScreen.style.display='none';
+      gameOverScreen.style.display='none';
+      speedUpText.style.display='none';
+      leaderboardOverlay.style.display='none';
+      backgroundMusic.play().catch(()=>{});
+      gameLoop();
+    }
+
+    async function gameOver(){
+      if (!gameRunning) return;
+      gameRunning = false;
+      backgroundMusic.currentTime = 0; backgroundMusic.pause();
+
+      if (loggedInUser){
+        try{
+          const newHS = await submitScoreToServer(loggedInUser.id, score);
+          if (typeof newHS === 'number') {
+            highScore = newHS;
+            localStorage.setItem('highScore', String(highScore));
+            highScoreElement.textContent = highScore;
+          }
+        }catch(e){ console.error(e); }
+      } else {
+        if (score > highScore){ highScore = score; localStorage.setItem('highScore', String(highScore)); highScoreElement.textContent = highScore; }
+      }
+
+      finalScoreElement.textContent = score;
+      finalHighScoreElement.textContent = highScore;
+
+      // tampilkan layar game over + leaderboard samping
+      gameOverScreen.style.display='flex';
+      fetchLeaderboard(); // refresh ranking terkini
+    }
+
+    async function submitScoreToServer(userId, score){
+      const res = await fetch('/api/submit-score',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({userId, score})
+      });
+      if (!res.ok) { console.error('Submit score failed:', res.statusText); return null; }
+      const data = await res.json();
+      // server mengembalikan { newHighScore: number }
+      return data.newHighScore;
+    }
+
+    async function fetchLeaderboard(){
+      try{
+        const res = await fetch('/api/leaderboard');
+        if (!res.ok) { console.error('Failed to fetch leaderboard'); return; }
+        const data = await res.json(); // [{id, username, score}, ...]
+
+        // Siapkan helper render agar DRY
+        const renderTo = (ul) => {
+          ul.innerHTML = '';
+          data.forEach((p, i) => {
+            const li = document.createElement('li');
+            const name = p.username || p.id; // fallback jika server belum kirim username
+            li.textContent = `${i+1}. ${name}`;
+            const span = document.createElement('span'); span.textContent = p.score;
+            li.appendChild(span);
+            if (loggedInUser && p.id === loggedInUser.id) li.classList.add('highlight');
+            ul.appendChild(li);
+          });
+        };
+
+        // overlay pojok kanan (kalau dipakai), start screen box, dan gameover box
+        renderTo(leaderboardListOverlay);
+        renderTo(leaderboardListStart);
+        renderTo(leaderboardListGameOver);
+      } catch(err){ console.error('Error fetching leaderboard:', err); }
+    }
+
+    // --- Controls
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', () => {
+      startGame();
+      if (loggedInUser) fetchLeaderboard();
+    });
+    discordLoginButton.addEventListener('click', () => { window.location.href = '/api/login/discord'; });
+
+    document.addEventListener('keydown', (e) => {
+      const k = e.key ? e.key.toLowerCase() : '';
+      if (e.code === 'ArrowUp' || k === 'w') upPressed = true;
+      if (e.code === 'ArrowDown' || k === 's') downPressed = true;
+      if (!gameRunning && startScreen.style.display !== 'none' && startButton.style.display !== 'none'){
+        if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || k === 'w' || k === 's') startGame();
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      const k = e.key ? e.key.toLowerCase() : '';
+      if (e.code === 'ArrowUp' || k === 'w') upPressed = false;
+      if (e.code === 'ArrowDown' || k === 's') downPressed = false;
+    });
+
+    canvas.addEventListener('touchstart',(e)=>{
+      e.preventDefault();
+      if (!gameRunning && startButton.style.display !== 'none'){ startGame(); return; }
+      const rect = canvas.getBoundingClientRect();
+      const touchY = e.touches[0].clientY - rect.top;
+      if (touchY < canvas.height/2){ upPressed = true; downPressed = false; }
+      else { downPressed = true; upPressed = false; }
+    }, {passive:false});
+    canvas.addEventListener('touchend',()=>{ upPressed=false; downPressed=false; });
+
+    function animateStartScreen(){
+      if (!gameRunning && startScreen.style.display !== 'none'){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        drawBackground(); wizard.draw(); frameCount++; requestAnimationFrame(animateStartScreen);
+      }
+    }
+
+    function resizeCanvas(){
+      const container = document.querySelector('.game-container');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      wizard.x = canvas.width/4;
+      wizard.y = canvas.height/2;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      animateStartScreen();
+      // Tampilkan leaderboard di start/gameover; overlay kanan muncul jika login
+      fetchLeaderboard();
+    });
+    window.addEventListener('resize', resizeCanvas);
+  </script>
+</body>
+</html>
