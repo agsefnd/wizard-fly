@@ -16,13 +16,12 @@ app.use(session({
 }));
 
 // simpan skor di memory
-// Format: { userId: { username: '...', score: ... } }
 const scores = {};
 
 // Discord OAuth config
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REDIRECT_URI;
+const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/api/callback';
 
 // serve file statis DARI FOLDER public
 app.use(express.static(path.join(__dirname, 'public')));
@@ -111,7 +110,7 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
-// 👉 Export app (biar Vercel bisa pakai handler)
+// Export app
 module.exports = app;
 
 // Dev local
