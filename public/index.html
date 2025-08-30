@@ -197,7 +197,7 @@
                 <h3>Score: <span id="score">0</span></h3>
             </div>
             <div class="score-container user-info" id="user-info">
-                <img id="user-avatar" src="" alt="Avatar" style="display: none;">
+                <img id="user-avatar" src="" alt="Avatar">
                 <span id="username-display"></span>
             </div>
             <div class="score-container">
@@ -265,7 +265,7 @@
         let gameRunning = false;
         let score = 0;
         let highScore = localStorage.getItem('highScore') || 0;
-        let discordUser = null;
+        let discordUser = JSON.parse(localStorage.getItem('discordUser'));
         highScoreElement.textContent = highScore;
         let frameCount = 0;
         const wallDistance = 300;
@@ -273,6 +273,9 @@
         let upPressed = false;
         let downPressed = false;
         
+        const discordClientId = '1410972302971244645';
+        const redirectUri = 'https://wizard-fly.vercel.app/api/callback';
+
         const mageImage = new Image();
         mageImage.src = 'mage.png';
         let isMageLoaded = false;
@@ -489,47 +492,26 @@
             gameLoop();
         }
 
-        async function gameOver() {
+        function gameOver() {
             gameRunning = false;
             backgroundMusic.currentTime = 0;
             backgroundMusic.pause();
-
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('highScore', highScore);
                 highScoreElement.textContent = highScore;
             }
-
             finalScoreElement.textContent = score;
             finalHighScoreElement.textContent = highScore;
-            
-            // Tampilkan layar Game Over sementara menunggu
             gameOverScreen.style.display = 'flex';
-
+            
+            // Simpan skor ke database jika user sudah login
             if (discordUser) {
-                try {
-                    // Kirim skor ke server
-                    await fetch('/api/submit-score', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ score: score })
-                    });
-                    
-                    // Setelah skor berhasil dikirim, panggil leaderboard
-                    setTimeout(() => {
-                        fetchLeaderboard(true);
-                    }, 1500); // Jeda 1.5 detik
-                } catch (error) {
-                    console.error('Failed to submit score:', error);
-                    setTimeout(() => {
-                        fetchLeaderboard(true);
-                    }, 1500); // Jeda 1.5 detik
-                }
-            } else {
-                // Jika tidak login, tampilkan leaderboard tanpa mengirim skor
-                setTimeout(() => {
-                    fetchLeaderboard(true);
-                }, 1500); // Jeda 1.5 detik
+                fetch('/api/callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: discordUser.id, score: score, action: 'save_score' })
+                });
             }
         }
         
@@ -538,54 +520,31 @@
             startButton.style.display = 'block';
             userInfoContainer.style.display = 'flex';
             userAvatar.src = `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`;
-            userAvatar.style.display = 'inline';
             usernameDisplay.textContent = discordUser.username;
         }
 
-        async function fetchUser() {
-            try {
-                const response = await fetch('/api/user');
-                if (response.ok) {
-                    discordUser = await response.json();
-                    updateUIOnLogin();
-                } else {
-                    console.error('User not logged in');
-                }
-            } catch (error) {
-                console.error('Failed to fetch user:', error);
-            }
-        }
-
-        async function fetchLeaderboard(showAfterGameOver = false) {
-            try {
-                const response = await fetch('/api/leaderboard');
-                const data = await response.json();
-                
-                leaderboardList.innerHTML = '';
-                data.forEach((entry, index) => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>${index + 1}. ${entry.username}</strong><span>${entry.score}</span>`;
-                    leaderboardList.appendChild(li);
-                });
-
-                if (showAfterGameOver) {
-                    gameOverScreen.style.display = 'none';
-                    leaderboardScreen.style.display = 'flex';
-                } else {
+        function fetchLeaderboard() {
+            fetch('/api/callback?action=get_leaderboard')
+                .then(response => response.json())
+                .then(data => {
+                    leaderboardList.innerHTML = '';
+                    data.forEach((entry, index) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<strong>${index + 1}. ${entry.username}</strong><span>${entry.score}</span>`;
+                        leaderboardList.appendChild(li);
+                    });
                     startScreen.style.display = 'none';
                     leaderboardScreen.style.display = 'flex';
-                }
-            } catch (error) {
-                console.error('Failed to load leaderboard:', error);
-            }
+                })
+                .catch(error => console.error('Gagal memuat leaderboard:', error));
         }
 
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
         discordLoginButton.addEventListener('click', () => {
-            window.location.href = `/api/login/discord`;
+            window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify`;
         });
-        showLeaderboardButton.addEventListener('click', () => fetchLeaderboard());
+        showLeaderboardButton.addEventListener('click', fetchLeaderboard);
         backToStartButton.addEventListener('click', () => {
             leaderboardScreen.style.display = 'none';
             startScreen.style.display = 'flex';
@@ -623,7 +582,7 @@
         });
 
         function animateStartScreen() {
-            if (!gameRunning && startScreen.style.display !== 'none' && leaderboardScreen.style.display === 'none' && gameOverScreen.style.display === 'none') {
+            if (!gameRunning && startScreen.style.display !== 'none') {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawBackground();
                 wizard.draw();
@@ -642,8 +601,10 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
-            fetchUser();
             animateStartScreen();
+            if (discordUser) {
+                updateUIOnLogin();
+            }
         });
         window.addEventListener('resize', resizeCanvas);
     </script>

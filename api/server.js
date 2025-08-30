@@ -3,9 +3,11 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs').promises; // Menggunakan fs.promises untuk operasi async
 const fetch = require('node-fetch');
 
 const app = express();
+const SCORES_FILE = path.join(__dirname, 'scores.json');
 
 // Middleware
 app.use(bodyParser.json());
@@ -15,13 +17,22 @@ app.use(session({
     saveUninitialized: true
 }));
 
-// Karena Vercel tidak mendukung penyimpanan file persisten, 
-// kita akan menyimpan skor di memori sebagai contoh.
-// Untuk aplikasi sungguhan, gunakan database seperti Firebase atau MongoDB.
-const scores = {};
+// Fungsi untuk membaca dan menulis skor ke file
+async function readScores() {
+    try {
+        const data = await fs.readFile(SCORES_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            return {};
+        }
+        throw err;
+    }
+}
 
-// Serve file statis dari folder public
-app.use(express.static(path.join(__dirname, 'public')));
+async function writeScores(data) {
+    await fs.writeFile(SCORES_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
 
 // Root
 app.get('/', (req, res) => {
@@ -65,7 +76,7 @@ app.get('/api/callback', async (req, res) => {
         });
         const user = await userResponse.json();
 
-        // Simpan data pengguna di sesi
+        // Simpan data pengguna di sesi untuk keamanan
         req.session.userId = user.id;
         req.session.username = user.username;
         req.session.avatar = user.avatar;
@@ -78,7 +89,7 @@ app.get('/api/callback', async (req, res) => {
 });
 
 // Submit score
-app.post('/api/submit-score', (req, res) => {
+app.post('/api/submit-score', async (req, res) => {
     const { score } = req.body;
     const userId = req.session.userId;
     const username = req.session.username;
@@ -87,15 +98,18 @@ app.post('/api/submit-score', (req, res) => {
         return res.status(401).json({ message: 'User not authenticated' });
     }
 
+    const scores = await readScores();
     if (!scores[userId] || score > scores[userId].score) {
         scores[userId] = { username, score };
+        await writeScores(scores);
     }
 
     res.json({ newHighScore: scores[userId].score });
 });
 
 // Leaderboard
-app.get('/api/leaderboard', (req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
+    const scores = await readScores();
     const leaderboard = Object.values(scores)
         .sort((a, b) => b.score - a.score)
         .slice(0, 10);
