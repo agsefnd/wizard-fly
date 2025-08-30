@@ -489,7 +489,7 @@
             gameLoop();
         }
 
-        function gameOver() {
+        async function gameOver() {
             gameRunning = false;
             backgroundMusic.currentTime = 0;
             backgroundMusic.pause();
@@ -502,24 +502,35 @@
 
             finalScoreElement.textContent = score;
             finalHighScoreElement.textContent = highScore;
+            
+            // Tampilkan layar Game Over sementara menunggu
             gameOverScreen.style.display = 'flex';
 
-            // PENTING: Panggil fungsi ini untuk menyimpan skor dan menampilkan leaderboard
-            setTimeout(() => {
-                if (discordUser) {
-                    fetch('/api/submit-score', {
+            if (discordUser) {
+                try {
+                    // Kirim skor ke server
+                    await fetch('/api/submit-score', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ score: score })
-                    }).then(() => {
-                        // Setelah skor tersimpan, panggil leaderboard
-                        fetchLeaderboard(true);
                     });
-                } else {
-                    // Jika tidak login, tetap tampilkan leaderboard tapi tanpa kirim skor
-                    fetchLeaderboard(true);
+                    
+                    // Setelah skor berhasil dikirim, panggil leaderboard
+                    setTimeout(() => {
+                        fetchLeaderboard(true);
+                    }, 1500); // Jeda 1.5 detik
+                } catch (error) {
+                    console.error('Failed to submit score:', error);
+                    setTimeout(() => {
+                        fetchLeaderboard(true);
+                    }, 1500); // Jeda 1.5 detik
                 }
-            }, 1500); // Tunggu 1.5 detik
+            } else {
+                // Jika tidak login, tampilkan leaderboard tanpa mengirim skor
+                setTimeout(() => {
+                    fetchLeaderboard(true);
+                }, 1500); // Jeda 1.5 detik
+            }
         }
         
         function updateUIOnLogin() {
@@ -558,11 +569,9 @@
                 });
 
                 if (showAfterGameOver) {
-                    // Tampilkan leaderboard setelah game over
                     gameOverScreen.style.display = 'none';
                     leaderboardScreen.style.display = 'flex';
                 } else {
-                    // Tampilkan leaderboard dari tombol utama
                     startScreen.style.display = 'none';
                     leaderboardScreen.style.display = 'flex';
                 }
