@@ -87,7 +87,7 @@
   </div>
 
   <audio id="background-music" loop>
-    <source src="efek.mp3" type="audio/mpeg"/>
+    <source src="/efek.mp3" type="audio/mpeg"/>
     Your browser does not support the audio element.
   </audio>
 
@@ -155,12 +155,12 @@
     // --- Input
     let upPressed = false, downPressed = false;
 
-    // --- Assets
-    const mageImage = new Image(); mageImage.src = 'mage.png';
+    // --- Assets (dari /public)
+    const mageImage = new Image(); mageImage.src = '/mage.png';
     let isMageLoaded = false;
     let wizardWidth = 50, wizardHeight = 50;
 
-    const backgroundImage = new Image(); backgroundImage.src = 'island.png';
+    const backgroundImage = new Image(); backgroundImage.src = '/island.png';
     let isBackgroundLoaded = false, backgroundX = 0;
 
     mageImage.onload = () => {
