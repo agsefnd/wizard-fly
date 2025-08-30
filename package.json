@@ -20,9 +20,9 @@
   "homepage": "https://github.com/agsefnd/flying-wizard-update#readme",
   "dependencies": {
     "body-parser": "^2.2.0",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "express-session": "^1.18.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^2.7.0"
   }
 }
