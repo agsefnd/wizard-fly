@@ -15,7 +15,7 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// simpan skor di memory
+// in-memory scores
 const scores = {};
 
 // Discord OAuth config
@@ -23,13 +23,10 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/api/callback';
 
-// serve file statis
-app.use(express.static(path.join(__dirname, 'public')));
+// serve static files
+app.use(express.static('public'));
 
-// debug
-app.get('/ping', (req, res) => res.send('pong 🧙‍♂️ server is alive!'));
-
-// login discord
+// api/login/discord
 app.get('/api/login/discord', (req, res) => {
   const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
     REDIRECT_URI
@@ -37,10 +34,10 @@ app.get('/api/login/discord', (req, res) => {
   res.redirect(redirect);
 });
 
-// callback
+// api/callback
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
-  if (!code) return res.send('No code provided');
+  if (!code) return res.status(400).send('No code provided');
   try {
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -63,7 +60,6 @@ app.get('/api/callback', async (req, res) => {
     // Simpan data pengguna di sesi untuk keamanan
     req.session.userId = user.id;
     req.session.username = user.username;
-    req.session.avatar = user.avatar;
     
     // Alihkan langsung ke halaman utama
     res.redirect('/');
@@ -73,19 +69,18 @@ app.get('/api/callback', async (req, res) => {
   }
 });
 
-// get user info
+// api/user
 app.get('/api/user', (req, res) => {
     if (req.session.userId) {
         return res.json({
             id: req.session.userId,
             username: req.session.username,
-            avatar: req.session.avatar
         });
     }
     res.status(401).json({ message: 'User not logged in' });
 });
 
-// submit score
+// api/submit-score
 app.post('/api/submit-score', (req, res) => {
   const { score } = req.body;
   const userId = req.session.userId;
@@ -95,14 +90,14 @@ app.post('/api/submit-score', (req, res) => {
     return res.status(401).json({ message: 'User not authenticated' });
   }
   
-  // Perbarui skor dengan nama pengguna
+  // Update score
   if (!scores[userId] || score > scores[userId].score) {
     scores[userId] = { username: username, score: score };
   }
   res.json({ newHighScore: scores[userId].score });
 });
 
-// leaderboard
+// api/leaderboard
 app.get('/api/leaderboard', (req, res) => {
   const leaderboard = Object.values(scores)
     .sort((a, b) => b.score - a.score)
@@ -110,11 +105,5 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
-// Export app
+// Vercel requires a handler
 module.exports = app;
-
-// Dev local
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
-}
