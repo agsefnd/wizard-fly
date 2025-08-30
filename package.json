@@ -1,28 +1,15 @@
 {
   "name": "wizard-fly",
   "version": "1.0.0",
-  "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/agsefnd/flying-wizard-update.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/agsefnd/flying-wizard-update/issues"
-  },
-  "homepage": "https://github.com/agsefnd/flying-wizard-update#readme",
   "dependencies": {
-    "body-parser": "^2.2.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "express-session": "^1.18.2",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
     "node-fetch": "^2.7.0"
   }
 }
