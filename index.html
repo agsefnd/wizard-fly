@@ -11,7 +11,6 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
         body {
             background: #000;
             min-height: 100vh;
@@ -20,7 +19,6 @@
             align-items: center;
             overflow: hidden;
         }
-
         .game-container {
             position: relative;
             width: 100vw;
@@ -30,7 +28,6 @@
             align-items: center;
             overflow: hidden;
         }
-
         canvas {
             background: #1a1a1a;
             display: block;
@@ -42,7 +39,6 @@
             left: 0;
             z-index: 1;
         }
-
         .ui-container {
             position: absolute;
             top: 0;
@@ -55,7 +51,6 @@
             z-index: 10;
             text-shadow: 1px 1px 2px #000;
         }
-        
         .score-container, .user-info {
             background: rgba(0, 0, 0, 0.5);
             padding: 10px 20px;
@@ -72,7 +67,6 @@
             margin-right: 10px;
             vertical-align: middle;
         }
-
         .start-screen, .game-over-screen, .leaderboard-screen {
             position: absolute;
             top: 0;
@@ -87,24 +81,20 @@
             color: white;
             z-index: 20;
         }
-
         .game-over-screen, .leaderboard-screen {
             display: none;
         }
-
         h1 {
             font-size: 3rem;
             margin-bottom: 20px;
             text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
             color: #fff;
         }
-
         h2 {
             font-size: 2rem;
             margin-bottom: 30px;
             color: #ffcc00;
         }
-
         button {
             padding: 15px 30px;
             font-size: 1.2rem;
@@ -117,13 +107,11 @@
             transition: all 0.3s ease;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
-
         button:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
             background: linear-gradient(to right, #ff0080, #ffcc00);
         }
-        
         .instructions {
             max-width: 90%;
             text-align: center;
@@ -131,7 +119,6 @@
             line-height: 1.6;
             font-size: 1rem;
         }
-
         .key {
             display: inline-block;
             padding: 2px 8px;
@@ -139,7 +126,6 @@
             border-radius: 5px;
             font-weight: bold;
         }
-
         #speed-up-text {
             position: absolute;
             top: 50%;
@@ -152,7 +138,6 @@
             display: none;
             z-index: 30;
         }
-
         @keyframes fadeOut {
             from {
                 opacity: 1;
@@ -163,7 +148,6 @@
                 transform: translate(-50%, -50%) scale(1.5);
             }
         }
-        
         .leaderboard-screen ol {
             list-style: none;
             padding: 0;
@@ -197,16 +181,14 @@
                 <h3>Score: <span id="score">0</span></h3>
             </div>
             <div class="score-container user-info" id="user-info">
-                <img id="user-avatar" src="" alt="Avatar">
+                <img id="user-avatar" src="" alt="Avatar" style="display: none;">
                 <span id="username-display"></span>
             </div>
             <div class="score-container">
                 <h3>High Score: <span id="high-score">0</span></h3>
             </div>
         </div>
-
         <div id="speed-up-text">SPEED UP!</div>
-
         <div class="start-screen" id="start-screen">
             <h1>Flying Wizard</h1>
             <div class="instructions">
@@ -218,28 +200,22 @@
             <button id="start-button" style="display: none;">Mulai Game</button>
             <button id="show-leaderboard-button">Lihat Leaderboard</button>
         </div>
-
         <div class="game-over-screen" id="game-over-screen">
             <h2>Game Over!</h2>
             <p class="instructions">Skor Akhir: <span id="final-score">0</span></p>
             <p class="instructions">Skor Tertinggi: <span id="final-high-score">0</span></p>
             <button id="restart-button">Main Lagi</button>
         </div>
-
         <div class="leaderboard-screen" id="leaderboard-screen">
             <h2>Leaderboard Penyihir</h2>
             <ol id="leaderboard-list"></ol>
             <button id="back-to-start-button">Kembali</button>
         </div>
-
         <canvas id="game-canvas"></canvas>
     </div>
-
     <audio id="background-music" loop>
         <source src="efek.mp3" type="audio/mpeg">
-        Your browser does not support the audio element.
     </audio>
-
     <script>
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -261,32 +237,25 @@
         const userInfoContainer = document.getElementById('user-info');
         const userAvatar = document.getElementById('user-avatar');
         const usernameDisplay = document.getElementById('username-display');
-
         let gameRunning = false;
         let score = 0;
         let highScore = localStorage.getItem('highScore') || 0;
-        let discordUser = JSON.parse(localStorage.getItem('discordUser'));
+        let discordUser = null;
         highScoreElement.textContent = highScore;
         let frameCount = 0;
         const wallDistance = 300;
         let nextSpeedIncrease = 10;
         let upPressed = false;
         let downPressed = false;
-        
-        const discordClientId = '1410972302971244645';
-        const redirectUri = 'https://wizard-fly.vercel.app/api/callback';
-
         const mageImage = new Image();
         mageImage.src = 'mage.png';
         let isMageLoaded = false;
         let wizardWidth = 50;
         let wizardHeight = 50;
-
         const backgroundImage = new Image();
         backgroundImage.src = 'island.png';
         let isBackgroundLoaded = false;
         let backgroundX = 0;
-
         mageImage.onload = () => {
             isMageLoaded = true;
             const ratio = mageImage.width / mageImage.height;
@@ -296,31 +265,26 @@
             wizard.height = wizardHeight;
             if (isBackgroundLoaded) animateStartScreen();
         };
-
         mageImage.onerror = () => {
             isMageLoaded = false;
             wizard.width = 60;
             wizard.height = 60;
             if (isBackgroundLoaded) animateStartScreen();
         };
-
         backgroundImage.onload = () => {
             isBackgroundLoaded = true;
             if (isMageLoaded) animateStartScreen();
         };
-
         backgroundImage.onerror = () => {
             isBackgroundLoaded = false;
             if (isMageLoaded) animateStartScreen();
         };
-
         const wizard = {
             x: 100,
             y: canvas.height / 2,
             width: wizardWidth,
             height: wizardHeight,
             speedY: 7,
-
             draw() {
                 const hoverOffset = Math.sin(frameCount * 0.1) * 5;
                 if (isMageLoaded) {
@@ -338,7 +302,6 @@
                     ctx.closePath();
                     ctx.fill();
                 }
-
                 ctx.save();
                 ctx.filter = 'blur(8px)';
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -347,7 +310,6 @@
                 ctx.fill();
                 ctx.restore();
             },
-
             update() {
                 if (upPressed) {
                     this.y -= this.speedY;
@@ -355,7 +317,6 @@
                 if (downPressed) {
                     this.y += this.speedY;
                 }
-
                 if (this.y < this.height / 2) {
                     this.y = this.height / 2;
                 }
@@ -364,10 +325,8 @@
                 }
             }
         };
-
         let walls = [];
         let wallSpeed = 4;
-
         class Wall {
             constructor() {
                 this.width = 30;
@@ -380,13 +339,11 @@
                 this.offsetY = Math.random() * 100 + 50;
                 this.speedY = (Math.random() - 0.5) * 2;
             }
-
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, 0, this.width, this.topHeight);
                 const bottomY = this.topHeight + this.gap;
                 ctx.fillRect(this.x, bottomY, this.width, canvas.height - bottomY);
-
                 ctx.fillStyle = '#333';
                 for (let i = 0; i < this.topHeight; i += 15) {
                     ctx.fillRect(this.x, i, this.width, 5);
@@ -395,17 +352,14 @@
                     ctx.fillRect(this.x, i, this.width, 5);
                 }
             }
-
             update() {
                 this.x -= wallSpeed;
                 this.topHeight = this.initialY + Math.sin(frameCount * this.speedY / 50) * this.offsetY;
-
                 if (!this.passed && this.x + this.width < wizard.x) {
                     score++;
                     scoreElement.textContent = score;
                     this.passed = true;
                 }
-
                 if (
                     wizard.x + wizard.width / 2 > this.x &&
                     wizard.x - wizard.width / 2 < this.x + this.width
@@ -419,7 +373,6 @@
                 }
             }
         }
-
         function gameLoop() {
             if (!gameRunning) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -450,7 +403,6 @@
             frameCount++;
             requestAnimationFrame(gameLoop);
         }
-
         function drawBackground() {
             if (isBackgroundLoaded) {
                 const ratio = backgroundImage.width / backgroundImage.height;
@@ -472,7 +424,6 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
-
         function startGame() {
             gameRunning = true;
             score = 0;
@@ -491,7 +442,6 @@
             backgroundMusic.play().catch(e => console.log("Autoplay was prevented."));
             gameLoop();
         }
-
         function gameOver() {
             gameRunning = false;
             backgroundMusic.currentTime = 0;
@@ -504,52 +454,61 @@
             finalScoreElement.textContent = score;
             finalHighScoreElement.textContent = highScore;
             gameOverScreen.style.display = 'flex';
-            
-            // Simpan skor ke database jika user sudah login
             if (discordUser) {
-                fetch('/api/callback', {
+                fetch('/api/submit-score', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: discordUser.id, score: score, action: 'save_score' })
+                    body: JSON.stringify({ score: score })
                 });
             }
         }
-        
         function updateUIOnLogin() {
             discordLoginButton.style.display = 'none';
             startButton.style.display = 'block';
             userInfoContainer.style.display = 'flex';
             userAvatar.src = `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`;
+            userAvatar.style.display = 'inline';
             usernameDisplay.textContent = discordUser.username;
         }
-
-        function fetchLeaderboard() {
-            fetch('/api/callback?action=get_leaderboard')
-                .then(response => response.json())
-                .then(data => {
-                    leaderboardList.innerHTML = '';
-                    data.forEach((entry, index) => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `<strong>${index + 1}. ${entry.username}</strong><span>${entry.score}</span>`;
-                        leaderboardList.appendChild(li);
-                    });
-                    startScreen.style.display = 'none';
-                    leaderboardScreen.style.display = 'flex';
-                })
-                .catch(error => console.error('Gagal memuat leaderboard:', error));
+        async function fetchUser() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    discordUser = await response.json();
+                    updateUIOnLogin();
+                } else {
+                    console.error('User not logged in');
+                }
+            } catch (error) {
+                console.error('Failed to fetch user:', error);
+            }
         }
-
+        async function fetchLeaderboard() {
+            try {
+                const response = await fetch('/api/leaderboard');
+                const data = await response.json();
+                leaderboardList.innerHTML = '';
+                data.forEach((entry, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${index + 1}. ${entry.username}</strong><span>${entry.score}</span>`;
+                    leaderboardList.appendChild(li);
+                });
+                startScreen.style.display = 'none';
+                leaderboardScreen.style.display = 'flex';
+            } catch (error) {
+                console.error('Failed to load leaderboard:', error);
+            }
+        }
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
         discordLoginButton.addEventListener('click', () => {
-            window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify`;
+            window.location.href = `/api/login/discord`;
         });
         showLeaderboardButton.addEventListener('click', fetchLeaderboard);
         backToStartButton.addEventListener('click', () => {
             leaderboardScreen.style.display = 'none';
             startScreen.style.display = 'flex';
         });
-
         document.addEventListener('keydown', (e) => {
             if (e.code === 'ArrowUp' || e.key === 'w') upPressed = true;
             if (e.code === 'ArrowDown' || e.key === 's') downPressed = true;
@@ -557,12 +516,10 @@
                 startGame();
             }
         });
-
         document.addEventListener('keyup', (e) => {
             if (e.code === 'ArrowUp' || e.key === 'w') upPressed = false;
             if (e.code === 'ArrowDown' || e.key === 's') downPressed = false;
         });
-
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touchY = e.touches[0].clientY - canvas.getBoundingClientRect().top;
@@ -575,14 +532,12 @@
             }
             if (!gameRunning) startGame();
         }, { passive: false });
-        
         canvas.addEventListener('touchend', () => {
             upPressed = false;
             downPressed = false;
         });
-
         function animateStartScreen() {
-            if (!gameRunning && startScreen.style.display !== 'none') {
+            if (!gameRunning && startScreen.style.display !== 'none' && leaderboardScreen.style.display === 'none' && gameOverScreen.style.display === 'none') {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawBackground();
                 wizard.draw();
@@ -590,7 +545,6 @@
                 requestAnimationFrame(animateStartScreen);
             }
         }
-        
         function resizeCanvas() {
             const container = document.querySelector('.game-container');
             canvas.width = container.clientWidth;
@@ -598,13 +552,10 @@
             wizard.x = canvas.width / 4;
             wizard.y = canvas.height / 2;
         }
-
         document.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
+            fetchUser();
             animateStartScreen();
-            if (discordUser) {
-                updateUIOnLogin();
-            }
         });
         window.addEventListener('resize', resizeCanvas);
     </script>
