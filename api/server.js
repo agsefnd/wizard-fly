@@ -24,6 +24,8 @@ const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/api/callback';
 
 // serve file statis DARI FOLDER public
+// Vercel akan secara otomatis melayani file dari sini,
+// jadi tidak perlu app.get('/') secara eksplisit.
 app.use(express.static(path.join(__dirname, 'public')));
 
 // debug
