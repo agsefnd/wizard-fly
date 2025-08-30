@@ -33,7 +33,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 app.get('/api/login/discord', (req, res) => {
-  const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
+  const redirect = `https://discord.com/oauth2/authorize?client_id=1410972302971244645&response_type=code&redirect_uri=https%3A%2F%2Fwizard-fly-qiyc.vercel.app%2Fapi%2Fcallback&scope=identify`;
   res.redirect(redirect);
 });
 
