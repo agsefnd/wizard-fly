@@ -23,10 +23,10 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'https://wizard-fly.vercel.app/api/callback';
 
-// serve static files
-app.use(express.static('public'));
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
-// api/login/discord
+// API routes
 app.get('/api/login/discord', (req, res) => {
   const redirect = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
     REDIRECT_URI
@@ -34,7 +34,6 @@ app.get('/api/login/discord', (req, res) => {
   res.redirect(redirect);
 });
 
-// api/callback
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No code provided');
@@ -57,11 +56,9 @@ app.get('/api/callback', async (req, res) => {
     });
     const user = await userResponse.json();
     
-    // Simpan data pengguna di sesi untuk keamanan
     req.session.userId = user.id;
     req.session.username = user.username;
     
-    // Alihkan langsung ke halaman utama
     res.redirect('/');
   } catch (err) {
     console.error('Callback error:', err);
@@ -69,7 +66,6 @@ app.get('/api/callback', async (req, res) => {
   }
 });
 
-// api/user
 app.get('/api/user', (req, res) => {
     if (req.session.userId) {
         return res.json({
@@ -80,7 +76,6 @@ app.get('/api/user', (req, res) => {
     res.status(401).json({ message: 'User not logged in' });
 });
 
-// api/submit-score
 app.post('/api/submit-score', (req, res) => {
   const { score } = req.body;
   const userId = req.session.userId;
@@ -90,14 +85,12 @@ app.post('/api/submit-score', (req, res) => {
     return res.status(401).json({ message: 'User not authenticated' });
   }
   
-  // Update score
   if (!scores[userId] || score > scores[userId].score) {
     scores[userId] = { username: username, score: score };
   }
   res.json({ newHighScore: scores[userId].score });
 });
 
-// api/leaderboard
 app.get('/api/leaderboard', (req, res) => {
   const leaderboard = Object.values(scores)
     .sort((a, b) => b.score - a.score)
@@ -105,5 +98,15 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
-// Vercel requires a handler
+// Fallback route to serve the main HTML file for any non-API requests
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Vercel's entry point handler
 module.exports = app;
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+}
