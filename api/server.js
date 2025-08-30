@@ -20,7 +20,7 @@ app.use(session({
   },
 }));
 
-// In-memory scores
+// In-memory scores (to be replaced with persistent store in production)
 const scores = {};
 
 // Discord OAuth config
@@ -39,9 +39,13 @@ app.get('/api/login/discord', (req, res) => {
 
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
-  if (!code) return res.status(400).send('No code provided');
+  if (!code) {
+    console.error('No code provided');
+    return res.status(400).send('No code provided');
+  }
   
   try {
+    // Request token from Discord
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -55,6 +59,8 @@ app.get('/api/callback', async (req, res) => {
     });
 
     const tokenData = await tokenResponse.json();
+    console.log('Token Response:', tokenData); // Log token data for debugging
+
     if (tokenData.error) {
       console.error('OAuth Error:', tokenData.error);
       return res.status(500).send('OAuth token exchange failed');
@@ -65,11 +71,15 @@ app.get('/api/callback', async (req, res) => {
       return res.status(500).send('Token exchange failed');
     }
 
+    // Fetch user data from Discord
     const userResponse = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
-    const user = await userResponse.json();
 
+    const user = await userResponse.json();
+    console.log('Discord User:', user); // Log user data for debugging
+
+    // Store user data in session
     req.session.userId = user.id;
     req.session.username = user.username;
 
@@ -112,13 +122,10 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
+// Catch-all route to serve the main HTML file for any non-API requests
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Export the app for Vercel or other platforms
 module.exports = app;
-
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
-}
