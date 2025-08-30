@@ -576,7 +576,7 @@
         discordLoginButton.addEventListener('click', () => {
             window.location.href = `/api/login/discord`;
         });
-        showLeaderboardButton.addEventListener('click', fetchLeaderboard);
+        showLeaderboardButton.addEventListener('click', () => fetchLeaderboard());
         backToStartButton.addEventListener('click', () => {
             leaderboardScreen.style.display = 'none';
             startScreen.style.display = 'flex';
